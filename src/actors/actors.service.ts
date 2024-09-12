@@ -24,7 +24,13 @@ export class ActorsService {
         $or: [{ name: new RegExp(searchTerm, 'i') }, { slug: new RegExp(searchTerm, 'i') }],
       }
 
-    return this.ActorsModel.find(options).select('-updatedAt -__v').sort({ createdAd: 'desc' }).exec()
+    return this.ActorsModel.aggregate()
+      .match(options)
+      .lookup({ from: 'Movie', foreignField: 'actors', localField: '_id', as: 'movies' })
+      .addFields({ countMovies: { $size: '$movies' } })
+      .project({ __v: 0, updatedAt: 0, movies: 0 })
+      .sort({ createdAd: 'desc' })
+      .exec()
   }
 
   async createActor() {
