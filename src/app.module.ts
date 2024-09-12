@@ -10,13 +10,14 @@ import { GenreModule } from './genre/genre.module';
 import { FileModule } from './file/file.module';
 import { ActorsModule } from './actors/actors.module';
 import { MovieModule } from './movie/movie.module';
+import { RatingModule } from './rating/rating.module';
 
 @Module({
   imports: [ConfigModule.forRoot(), TypegooseModule.forRootAsync({
     imports: [ConfigModule],
     inject: [ConfigService],
     useFactory:getMongoDbConfig,
-  }), AuthModule, UserModule, GenreModule, FileModule, ActorsModule, MovieModule],
+  }), AuthModule, UserModule, GenreModule, FileModule, ActorsModule, MovieModule, RatingModule],
   controllers: [AppController],
   providers: [AppService],
 })
