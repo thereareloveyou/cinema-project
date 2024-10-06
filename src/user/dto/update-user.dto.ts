@@ -5,5 +5,7 @@ export class UpdateUserDto {
   email: string
 
   password?: string
-  idAdmin?: boolean
+  role?: TypeRoles
 }
+
+type TypeRoles = 'ADMIN' | 'USER'

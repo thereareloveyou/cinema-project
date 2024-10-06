@@ -1,90 +1,70 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
-import { InjectModel } from 'nestjs-typegoose'
-import { GenreModel } from './genre.model'
-import { ModelType } from '@typegoose/typegoose/lib/types'
-import { CreateGenreDto } from './dto/create-genre.dto'
-import { MovieService } from 'src/movie/movie.service'
-import { ICollection } from './genre.interface'
+import { Injectable } from '@nestjs/common'
+import { Genre } from '../dto/Genre.model'
+import { PrismaService } from 'src/prisma.service'
+import { GenreUpdate } from 'src/dto/GenreUpdate.dto'
 
 @Injectable()
 export class GenreService {
-  constructor(
-    @InjectModel(GenreModel) private readonly GenreModel: ModelType<GenreModel>,
-    private readonly movieService: MovieService
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async byId(_id: string) {
-    const genre = await this.GenreModel.findById(_id)
-
-    if (!genre) throw new NotFoundException('Genre not found!')
-
-    return genre
+  async byId(id: string) {
+    return await this.prisma.genre.findUnique({
+      where: {
+        id: id,
+      },
+    })
   }
 
-  async bySlag(slug: string) {
-    return this.GenreModel.findOne({ slug }).exec()
-  }
-
-  async create() {
-    const defaultValue: CreateGenreDto = {
-      description: '',
-      name: '',
-      slug: '',
-      icon: '',
-    }
-
-    const genre = await this.GenreModel.create(defaultValue)
-    return genre._id
-  }
-
-  async update(_id: string, dto: CreateGenreDto) {
-    const updateGenre = await this.GenreModel.findByIdAndUpdate(_id, dto, {
-      new: true,
-    }).exec()
-
-    if (!updateGenre) throw new NotFoundException('Not found genre')
-
-    return updateGenre
-  }
-
-  async delete(_id: string) {
-    const deleteGenre = await this.GenreModel.findByIdAndDelete(_id)
-
-    if (!deleteGenre) throw new NotFoundException('Not found genre')
-
-    return deleteGenre
+  async bySlug(slug: string) {
+    return await this.prisma.genre.findUnique({
+      where: {
+        slug: slug,
+      },
+    })
   }
 
   async getAllGenres(searchTerm?: string) {
-    let options = {}
+    if (searchTerm) {
+      return await this.prisma.genre.findMany({
+        where: {
+          OR: [
+            { name: { contains: searchTerm } },
+            { slug: { contains: searchTerm } },
+            { description: { contains: searchTerm } },
+          ],
+        },
+      })
+    }
 
-    if (searchTerm)
-      options = {
-        $or: [
-          { name: new RegExp(searchTerm, 'i') },
-          { slug: new RegExp(searchTerm, 'i') },
-          { description: new RegExp(searchTerm, 'i') },
-        ],
-      }
-
-    return this.GenreModel.find(options).select('-updateAt -__v').sort({ createdAd: 'desc' }).exec()
+    return await this.prisma.genre.findMany()
   }
 
-  async getCollections() {
-    const genres = await this.getAllGenres()
-    const collections = await Promise.all(
-      genres.map(async (genre) => {
-        const moviesByGenre = await this.movieService.byGenres([genre.id])
-        const result: ICollection = {
-          _id: String(genre.id),
-          image: moviesByGenre[0].bigPoster,
-          slug: genre.slug,
-          title: genre.name,
-        }
-        return result
-      })
-    )
+  async createGenre(dto: Genre) {
+    const genre = await this.prisma.genre.create({
+      data: {
+        ...dto
+      },
+    })
 
-    return collections
+    return genre.id
+  }
+
+  async deleteGenre(id: string) {
+    return await this.prisma.genre.delete({
+      where: {
+        id: id,
+      },
+    })
+  }
+
+  async updateGenre(dto: GenreUpdate, id: string) {
+    return await this.prisma.genre.update({
+      where: {
+        id: id,
+      },
+      data: {
+        ...dto,
+      },
+    })
   }
 }

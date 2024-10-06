@@ -1,56 +1,49 @@
-import { Injectable } from '@nestjs/common'
-import { InjectModel } from 'nestjs-typegoose'
-import { RatingModel } from './rating.model'
-import { ModelType } from '@typegoose/typegoose/lib/types'
+import { Injectable, NotFoundException } from '@nestjs/common'
+import { PrismaService } from '../prisma.service'
 import { MovieService } from 'src/movie/movie.service'
-import { Types } from 'mongoose'
-import { SetRatingDto } from './set-rating.dto'
 
 @Injectable()
 export class RatingService {
   constructor(
-    @InjectModel(RatingModel) private readonly RatingModel: ModelType<RatingModel>,
+    private readonly prisma: PrismaService,
     private readonly movieService: MovieService
   ) {}
 
-  async getMovieValueByUser(movieId: Types.ObjectId, userId: Types.ObjectId) {
-    return this.RatingModel.findOne({ movieId, userId })
-      .select('value')
-      .exec()
-      .then((data) => (data ? data.value : 0))
-  }
-
-  async averageRatingByMovie(movieId: Types.ObjectId | string) {
-    const ratingMovie: RatingModel[] = await this.RatingModel.aggregate()
-      .match({
-        movieId: new Types.ObjectId(movieId),
-      })
-      .exec()
-
-    return ratingMovie.reduce((acc, item) => acc + item.value, 0) / ratingMovie.length
-  }
-
-  async setRating(userId: Types.ObjectId, dto: SetRatingDto) {
-    const { movieId, value } = dto
-
-    const newRating = await this.RatingModel.findOneAndUpdate(
-      { movieId, userId },
-      {
-        movieId,
-        userId,
-        value,
+  async setRating(dto: { ratingValue: number; userId: string; movieId: string }) {
+    const newRating = await this.prisma.usersOnRatingsMovies.upsert({
+      where: {
+        movieId_userId: {
+          movieId: dto.movieId,
+          userId: dto.userId,
+        },
       },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true,
-      }
-    ).exec()
+      update: { ratingValue: dto.ratingValue },
+      create: {
+        movieId: dto.movieId,
+        userId: dto.userId,
+        ratingValue: dto.ratingValue,
+      },
+    })
 
-    const averageRating = await this.averageRatingByMovie(movieId)
+    if (!newRating) throw new NotFoundException('Could not find or update rating')
 
-    await this.movieService.updateRating(movieId, averageRating)
+    const avgRating = await this.avgRating(dto.movieId)
+
+    await this.movieService.updateRating(dto.movieId, avgRating)
 
     return newRating
+  }
+
+  async avgRating(id: string) {
+    const avg = await this.prisma.usersOnRatingsMovies.aggregate({
+      _avg: {
+        ratingValue: true,
+      },
+      where: {
+        movieId: id,
+      },
+    })
+
+    return avg._avg.ratingValue
   }
 }

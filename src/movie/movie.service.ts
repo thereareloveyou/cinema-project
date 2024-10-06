@@ -1,129 +1,94 @@
-import { Injectable } from '@nestjs/common'
-
-import { NotFoundException } from '@nestjs/common'
-import { Types } from 'mongoose'
-import { CreateMovieDto } from './create-movie.dto'
-import { InjectModel } from 'nestjs-typegoose'
-import { MovieModel } from './movie.model'
-import { ModelType } from '@typegoose/typegoose/lib/types'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { PrismaService } from 'src/prisma.service'
+import { CreateMovie } from '../dto/CreateMovie.dto'
+import { UpdateMovie } from 'src/dto/UpdateMove.dto'
 
 @Injectable()
 export class MovieService {
-  constructor(@InjectModel(MovieModel) private readonly MovieModel: ModelType<MovieModel>) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async bySlug(slug: string) {
-    const doc = await this.MovieModel.findOne({ slug }).populate('actors genres').exec()
-
-    if (!doc) throw new NotFoundException('Movie not found')
-
-    return doc
+  async createMovie(dto: CreateMovie) {
+    return await this.prisma.movie.create({
+      include: {
+        genres: true,
+        actors: true,
+        ratings: true,
+      },
+      data: {
+        ...dto,
+        genres: {
+          connect: dto.genres.map((i) => ({ id: i })) || [],
+        },
+        actors: {
+          connect: dto.actors.map((i) => ({ id: i })) || [],
+        },
+      },
+    })
   }
 
-  async byActor(actorId: string) {
-    const doc = await this.MovieModel.find({ actors: actorId }).exec()
-
-    if (!doc) throw new NotFoundException('Movie not found')
-
-    return doc
+  async getAllMovie() {
+    return await this.prisma.movie.findMany({
+      include: {
+        genres: true,
+        actors: true,
+        ratings: true,
+      },
+    })
   }
 
-  async byGenres(genreIds: Types.ObjectId[]) {
-    const doc = await this.MovieModel.find({ genres: { $in: genreIds } }).exec()
-
-    if (!doc) throw new NotFoundException('Movie not found')
-
-    return doc
+  async getAllPopular() {
+    return await this.prisma.movie.findMany({
+      include: {
+        genres: true,
+      },
+      where: {
+        countOpened: {
+          not: 0,
+        },
+      },
+    })
   }
 
-  async getMostPopular() {
-    return await this.MovieModel.find({ countOpened: { $gt: 0 } })
-      .sort({ countOpened: -1 })
-      .populate('genres')
-      .exec()
+  async updateMovie(id: string, dto: UpdateMovie) {
+    return await this.prisma.movie.update({
+      where: {
+        id: id,
+      },
+      data: {
+        ...dto,
+        genres: {
+          connect: dto.genres.map((i) => ({ id: i })) || [],
+        },
+        actors: {
+          connect: dto.actors.map((i) => ({ id: i })) || [],
+        },
+      },
+    })
   }
 
   async updateCountOpened(slug: string) {
-    const updateDoc = await this.MovieModel.findOneAndUpdate(
-      { slug },
-      { $inc: { countOpened: 1 } },
-      { new: true }
-    ).exec()
-
-    return updateDoc
-  }
-
-  async updateRating(id: Types.ObjectId, newRating: number) {
-    return this.MovieModel.findByIdAndUpdate(
-      id,
-      {
-        rating: newRating,
+    const updateCount = await this.prisma.movie.update({
+      where: {
+        slug: slug,
       },
-      {
-        new: true,
-      }
-    )
-  }
-
-  async byId(_id: string) {
-    const doc = await this.MovieModel.findById(_id)
-
-    if (!doc) throw new NotFoundException('Movie not found')
-
-    return doc
-  }
-
-  async getAll(searchTerm?: string) {
-    let options = {}
-
-    if (searchTerm)
-      options = {
-        $or: [{ title: new RegExp(searchTerm, 'i') }],
-      }
-
-    return this.MovieModel.find(options)
-      .select('-updatedAt -__v')
-      .sort({ createAd: 'desc' })
-      .populate('actors genres')
-      .exec()
-  }
-
-  async create() {
-    const defaultValue: CreateMovieDto = {
-      bigPoster: '',
-      poster: '',
-      title: '',
-      parameters: {
-        year: 0,
-        duration: 0,
-        country: '',
+      data: {
+        countOpened: { increment: 1 },
       },
-      slug: '',
-      description: '',
-      videoUrl: '',
-      genres: [],
-      actors: [],
-    }
+    })
 
-    const newMovie = await this.MovieModel.create(defaultValue)
-
-    return newMovie._id
+    return updateCount
   }
 
-  async update(_id: string, dto: CreateMovieDto) {
-    const updateDoc = await this.MovieModel.findByIdAndUpdate(_id, dto, {
-      new: true,
-    }).exec()
+  async updateRating(id: string, newRating: number) {
+    const data = this.prisma.movie.update({
+      where: {
+        id: id,
+      },
+      data: {
+        averageRating: newRating,
+      },
+    })
 
-    if (!updateDoc) throw new NotFoundException('Movie not found')
-
-    return updateDoc
-  }
-
-  async delete(_id: string) {
-    const deleteDoc = await this.MovieModel.findByIdAndDelete(_id)
-
-    if (!deleteDoc) throw new NotFoundException('Movie not found')
-
-    return deleteDoc
+    return data
   }
 }

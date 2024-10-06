@@ -2,15 +2,15 @@ import { Module } from '@nestjs/common'
 import { UserService } from './user.service'
 import { UserController } from './user.controller'
 import { TypegooseModule } from 'nestjs-typegoose'
-import { UserModel } from './user.model'
 import { ConfigModule } from '@nestjs/config'
+import { AuthModule } from 'src/auth/auth.module'
+import { AuthService } from 'src/auth/auth.service'
+import { JwtModule, JwtService } from '@nestjs/jwt'
+import { PrismaService } from 'src/prisma.service'
 
 @Module({
-  providers: [UserService],
+  providers: [UserService, PrismaService, JwtService],
   controllers: [UserController],
-  imports: [
-    TypegooseModule.forFeature([{ typegooseClass: UserModel, schemaOptions: { collection: 'User' } }]),
-    ConfigModule,
-  ],
+  imports: [],
 })
 export class UserModule {}

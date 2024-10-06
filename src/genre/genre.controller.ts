@@ -1,66 +1,46 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Query,
-  UsePipes,
-  ValidationPipe,
-} from '@nestjs/common'
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common'
 import { GenreService } from './genre.service'
 import { IdValidationPipe } from 'src/pipes/id.validation.pipe'
-import { Auth } from 'src/auth/decorators/auth.decorator'
-import { CreateGenreDto } from './dto/create-genre.dto'
+import { GenreUpdate } from 'src/dto/GenreUpdate.dto'
+import { Genre } from 'src/dto/Genre.model'
 
 @Controller('genres')
 export class GenreController {
-  constructor(private readonly genreService: GenreService) {}
+  constructor(private readonly GenreService: GenreService) {}
 
-  @Get('by-slug/:slug')
-  async bySlag(@Param('slug') slug: string) {
-    return this.genreService.bySlag(slug)
+  @Get(':id')
+  @HttpCode(200)
+  async getGenreById(@Param('id', IdValidationPipe) id: string) {
+    return this.GenreService.byId(id)
   }
 
-  @Get('/collections')
-  async getCollections() {
-    return this.genreService.getCollections()
+  @Get('by-slug/:slug')
+  @HttpCode(200)
+  async getGenreBySlug(@Param('slug') slug: string) {
+    return this.GenreService.bySlug(slug)
   }
 
   @Get()
-  async getAllGenres(@Query('searchTerm') searchTerm?: string) {
-    return this.genreService.getAllGenres(searchTerm)
+  @HttpCode(200)
+  async getAllGenres(@Query('searchTerm') searchTerm: string) {
+    return this.GenreService.getAllGenres(searchTerm)
   }
 
-  @Get('id')
-  @Auth('admin')
-  async get(@Param('id', IdValidationPipe) id: string) {
-    return this.genreService.byId(id)
-  }
-
-  @UsePipes(new ValidationPipe())
   @Post()
   @HttpCode(200)
-  @Auth('admin')
-  async create() {
-    return this.genreService.create()
+  async createGenre(@Body() dto: Genre) {
+    return this.GenreService.createGenre(dto)
   }
 
-  @UsePipes(new ValidationPipe())
   @Put(':id')
   @HttpCode(200)
-  @Auth('admin')
-  async update(@Param('id', IdValidationPipe) id: string, @Body() dto: CreateGenreDto) {
-    return this.genreService.update(id, dto)
+  async updateGenre(@Param('id', IdValidationPipe) id: string, @Body() dto: GenreUpdate) {
+    return this.GenreService.updateGenre(dto, id)
   }
 
   @Delete(':id')
   @HttpCode(200)
-  @Auth('admin')
-  async delete(@Param('id', IdValidationPipe) id: string) {
-    return this.genreService.delete(id)
+  async deleteGenre(@Param('id', IdValidationPipe) id: string) {
+    return this.GenreService.deleteGenre(id)
   }
 }
